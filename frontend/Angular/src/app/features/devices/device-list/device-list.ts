@@ -5,8 +5,10 @@ import { RouterLink } from '@angular/router';
 import { Notification, NotificationType } from '../../../shared/components/notification/notification';
 import { DeviceService } from '../../../core/services/device.service';
 import { DeviceTypeService } from '../../../core/services/device-type.service';
+import { LocationService } from '../../../core/services/location.service';
 import { Device } from '../../../core/models/device.model';
 import { DeviceType } from '../../../core/models/device-type.model';
+import { Building, Location as DeviceLocation } from '../../../core/models/location.model';
 
 @Component({
   selector: 'app-device-list',
@@ -17,6 +19,8 @@ import { DeviceType } from '../../../core/models/device-type.model';
 export class DeviceList implements OnInit {
   devices: Device[] = [];
   deviceTypes: DeviceType[] = [];
+  buildings: Building[] = [];
+  locations: DeviceLocation[] = [];
   searchTerm = '';
   loading = true;
 
@@ -27,6 +31,8 @@ export class DeviceList implements OnInit {
   editingId: string | null = null;
   formName = '';
   formDeviceTypeId = '';
+  formBuildingId = '';
+  formLocationId = '';
 
   showDeleteForm = false;
   deviceToDelete: Device | null = null;
@@ -34,11 +40,13 @@ export class DeviceList implements OnInit {
   constructor(
     private deviceService: DeviceService,
     private deviceTypeService: DeviceTypeService,
+    private locationService: LocationService,
     private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
     this.loadData();
+    this.loadBuildings();
   }
 
   get filteredDevices(): Device[] {
@@ -87,10 +95,49 @@ export class DeviceList implements OnInit {
     });
   }
 
+  loadBuildings() {
+    this.locationService.getBuildings().subscribe({
+      next: (buildings) => {
+        this.buildings = buildings;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.showNotification('error', "Unable to load buildings.");
+      }
+    });
+  }
+
+  // Loads the locations of one building; optionally preselects a location (edit mode).
+  private loadLocations(idBuilding: string, selectedLocationId = '') {
+    this.locationService.getLocations(idBuilding).subscribe({
+      next: (locations) => {
+        this.locations = locations;
+        this.formLocationId = selectedLocationId;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.showNotification('error', "Unable to load locations.");
+      }
+    });
+  }
+
+  onBuildingChange() {
+    this.formLocationId = '';
+    this.locations = [];
+    if (!this.formBuildingId) {
+      this.cdr.detectChanges();
+      return;
+    }
+    this.loadLocations(this.formBuildingId);
+  }
+
   openAddForm() {
     this.editingId = null;
     this.formName = '';
     this.formDeviceTypeId = '';
+    this.formBuildingId = '';
+    this.formLocationId = '';
+    this.locations = [];
     this.showForm = true;
   }
 
@@ -98,7 +145,15 @@ export class DeviceList implements OnInit {
     this.editingId = device.id_device;
     this.formName = device.name;
     this.formDeviceTypeId = device.id_device_type;
+    this.formBuildingId = device.id_building ?? '';
+    this.formLocationId = '';
+    this.locations = [];
     this.showForm = true;
+
+    // Devices created before locations existed have no building yet.
+    if (device.id_building) {
+      this.loadLocations(device.id_building, device.id_location ?? '');
+    }
   }
 
   cancelForm() {
@@ -106,15 +161,16 @@ export class DeviceList implements OnInit {
   }
 
   saveDevice() {
-    if (!this.formName.trim() || !this.formDeviceTypeId) {
+    if (!this.formName.trim() || !this.formDeviceTypeId || !this.formLocationId) {
       this.showForm = false;
-      this.showNotification('error', "Name and Device Type are required.");
+      this.showNotification('error', "Name, Device Type, Building and Location are required.");
       return;
     }
 
     const payload = {
       name: this.formName,
-      id_device_type: this.formDeviceTypeId
+      id_device_type: this.formDeviceTypeId,
+      id_location: this.formLocationId
     };
 
     const request = this.editingId
@@ -166,12 +222,15 @@ export class DeviceList implements OnInit {
   }
 
   exportToCsv() {
-    const headers = ['Device Name', 'Type', 'Subsystem', 'Risk Score', 'Level'];
+    const headers = ['Device Name', 'Type', 'Subsystem', 'Building', 'Floor', 'Zone', 'Risk Score', 'Level'];
 
     const rows = this.filteredDevices.map(d => [
       d.name,
       d.device_type_name || '',
       d.subsystem_name || '',
+      d.building_name || '',
+      d.floor || '',
+      d.zone || '',
       d.active_instances_count > 0 ? d.normalized_score.toString() : '',
       d.active_instances_count > 0 ? d.classification.label : 'No Risk',
     ]);
@@ -199,4 +258,3 @@ export class DeviceList implements OnInit {
     return `"${escaped}"`;
   }
 }
-

@@ -8,4 +8,9 @@ export interface Device {
   active_instances_count: number;
   normalized_score: number;
   classification: { label: string; color: string };
+  id_location: string | null;
+  id_building: string | null;
+  building_name: string | null;
+  floor: string | null;
+  zone: string | null;
 }

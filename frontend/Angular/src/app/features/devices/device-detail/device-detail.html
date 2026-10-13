@@ -96,6 +96,21 @@
             <p class="text-sm text-gray-900">{{ device.created_at | date:'yyyy-MM-dd' }}</p>
           </div>
 
+          <div>
+            <p class="text-xs text-gray-500">Building</p>
+            <p class="text-sm text-gray-900">{{ device.building_name || '—' }}</p>
+          </div>
+
+          <div>
+            <p class="text-xs text-gray-500">Floor</p>
+            <p class="text-sm text-gray-900">{{ device.floor || '—' }}</p>
+          </div>
+
+          <div class="col-span-2">
+            <p class="text-xs text-gray-500">Zone / room</p>
+            <p class="text-sm text-gray-900">{{ device.zone || '—' }}</p>
+          </div>
+
         </div>
 
       </div>

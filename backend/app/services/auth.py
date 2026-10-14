@@ -13,7 +13,7 @@ import jwt
 from datetime import datetime, timedelta, timezone
 from werkzeug.security import check_password_hash
 
-TOKEN_EXPIRY_HOURS = 8
+TOKEN_EXPIRY_HOURS = 1
 
 
 def verify_admin_credentials(username: str, password: str) -> bool:

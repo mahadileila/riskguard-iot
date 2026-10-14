@@ -216,7 +216,7 @@ export class DeviceList implements OnInit {
   }
 
   exportToCsv() {
-    const headers = ['Device Name', 'Type', 'Subsystem', 'Building', 'Floor', 'Position', 'Risk Score', 'Level'];
+    const headers = ['Device Name', 'Type', 'Subsystem', 'Building', 'Floor', 'Position', 'Risk Score (%)', 'Level'];
 
     const rows = this.filteredDevices.map(d => [
       d.name,

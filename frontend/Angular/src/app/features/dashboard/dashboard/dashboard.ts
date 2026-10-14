@@ -364,7 +364,7 @@ export class Dashboard implements OnInit, OnDestroy {
         animation: { duration: 500 },
         plugins: { legend: { display: false } },
         scales: {
-          x: { min: 0, max: 100, grid: { color: '#f3f4f6' }, title: { display: true, text: 'Average score' } },
+          x: { min: 0, max: 100, grid: { color: '#f3f4f6' }, title: { display: true, text: 'Average score (%)' } },
           y: { grid: { display: false } }
         }
       }

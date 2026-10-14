@@ -9,7 +9,7 @@ import { DeviceDetail } from './features/devices/device-detail/device-detail';
 import { Dashboard } from './features/dashboard/dashboard/dashboard';
 import { RiskFactorList } from './features/risk-factors/risk-factor-list/risk-factor-list';
 import { RiskClassificationList } from './features/risk-classifications/risk-classification-list/risk-classification-list';
-import { LocationManager } from './features/locations/location-manager/location-manager';
+import { BuildingList } from './features/building/building-list/building-list';
 
 export const routes: Routes = [
   { path: 'login', component: Login },
@@ -26,7 +26,7 @@ export const routes: Routes = [
       { path: 'subsystems', component: BmsSubsystemList, data: { breadcrumb: 'BMS Subsystems' } },
       { path: 'risk-factors', component: RiskFactorList, data: { breadcrumb: 'Risk Factors' } },
       { path: 'risk-classifications', component: RiskClassificationList, data: { breadcrumb: 'Risk Classifications' } },
-      { path: 'locations', component: LocationManager, data: { breadcrumb: 'Buildings & Locations' }},
+      { path: 'locations', component: BuildingList, data: { breadcrumb: 'Buildings' }},
     ]
   }
 ];

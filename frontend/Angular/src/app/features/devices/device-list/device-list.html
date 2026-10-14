@@ -253,21 +253,31 @@
         </select>
 
         <label class="block text-sm text-gray-600 mb-1">
-          Floor / zone
+          Floor
         </label>
 
         <select
-          [(ngModel)]="formLocationId"
+          [(ngModel)]="formFloor"
           [disabled]="!formBuildingId"
           class="w-full border border-gray-300 rounded-md px-3 py-2 mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400"
         >
-          <option value="" disabled>
-            {{ formBuildingId ? 'Select a location' : 'Select a building first' }}
+          <option [ngValue]="null" disabled>
+            {{ formBuildingId ? 'Select a floor' : 'Select a building first' }}
           </option>
-          @for (l of locations; track l.id_location) {
-            <option [value]="l.id_location">{{ l.label }}</option>
+          @for (f of floors; track f) {
+            <option [ngValue]="f">Floor {{ f }}</option>
           }
         </select>
+
+        <label class="block text-sm text-gray-600 mb-1">
+          Position on the floor (optional)
+        </label>
+
+        <input
+          [(ngModel)]="formZone"
+          class="w-full border border-gray-300 rounded-md px-3 py-2 mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="e.g. Room 4, Corridor 2"
+        />
 
         <div class="flex justify-end gap-2">
 

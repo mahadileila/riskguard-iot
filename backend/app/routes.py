@@ -12,6 +12,7 @@ from app.models import (
     Device,
     DeviceType,
     BmsSubsystem,
+    Building,
     RiskFactor,
     FactorGroup,
     CollectionInstance,
@@ -107,6 +108,7 @@ def serialize_device(device):
     active_count = CollectionInstance.query.filter_by(
         id_device=device.id_device
     ).count()
+    building = device.building
 
     return {
         "id_device": device.id_device,
@@ -118,7 +120,32 @@ def serialize_device(device):
         "active_instances_count": active_count,
         "normalized_score": score,
         "classification": classification,
+        "id_building": device.id_building,
+        "building_name": building.name if building else None,
+        "floor": device.floor,
+        "zone": device.zone,
     }
+
+
+def validate_placement(id_building, floor):
+    """Checks that the building exists and that the floor is inside its range.
+    Returns (building, floor_number, error_response); error_response is None
+    when the placement is valid."""
+    building = Building.query.filter_by(id_building=id_building, is_deleted=False).first()
+    if building is None:
+        return None, None, (jsonify({"error": "Invalid id_building"}), 400)
+
+    try:
+        floor_number = int(floor)
+    except (TypeError, ValueError):
+        return None, None, (jsonify({"error": "Field 'floor' must be a whole number"}), 400)
+
+    if floor_number < 1 or floor_number > building.floor_count:
+        return None, None, (jsonify({
+            "error": f"Floor must be between 1 and {building.floor_count} for this building"
+        }), 400)
+
+    return building, floor_number, None
 
 @main.route("/api/dashboard/summary", methods=["GET"])
 def get_dashboard_summary():
@@ -491,11 +518,21 @@ def create_device():
     if device_type is None:
         return jsonify({"error": "Invalid id_device_type"}), 400
 
+    if not data.get("id_building") or data.get("floor") in (None, ""):
+        return jsonify({"error": "Fields 'id_building' and 'floor' are required"}), 400
+
+    building, floor_number, error = validate_placement(data["id_building"], data["floor"])
+    if error:
+        return error
+
     device = Device(
         name=data["name"],
         id_device_type=data["id_device_type"],
         created_at=datetime.utcnow(),
-        is_deleted=False
+        is_deleted=False,
+        id_building=building.id_building,
+        floor=floor_number,
+        zone=(data.get("zone") or "").strip() or None,
     )
     db.session.add(device)
     db.session.commit()
@@ -523,6 +560,18 @@ def update_device(id_device):
         if device_type is None:
             return jsonify({"error": "Invalid id_device_type"}), 400
         device.id_device_type = data["id_device_type"]
+
+    if "id_building" in data or "floor" in data:
+        new_building_id = data.get("id_building", device.id_building)
+        new_floor = data.get("floor", device.floor)
+        building, floor_number, error = validate_placement(new_building_id, new_floor)
+        if error:
+            return error
+        device.id_building = building.id_building
+        device.floor = floor_number
+
+    if "zone" in data:
+        device.zone = (data["zone"] or "").strip() or None
 
     db.session.commit()
 
@@ -602,6 +651,117 @@ def get_device_instances(id_device):
         })
 
     return jsonify(result)
+
+
+# ============================================================
+# BUILDINGS
+# ============================================================
+
+def parse_floor_count(value):
+    """Returns (floor_count, error_message). A building has 1 to 200 floors."""
+    try:
+        floor_count = int(value)
+    except (TypeError, ValueError):
+        return None, "Field 'floor_count' must be a whole number"
+    if floor_count < 1 or floor_count > 200:
+        return None, "Field 'floor_count' must be between 1 and 200"
+    return floor_count, None
+
+
+def serialize_building(building):
+    return {
+        "id_building": building.id_building,
+        "name": building.name,
+        "floor_count": building.floor_count,
+        "devices_count": len([d for d in building.devices if not d.is_deleted]),
+    }
+
+
+@main.route("/api/buildings", methods=["GET"])
+def get_buildings():
+    buildings = Building.query.filter_by(is_deleted=False).order_by(Building.name).all()
+    return jsonify([serialize_building(b) for b in buildings])
+
+
+@main.route("/api/buildings/<id_building>", methods=["GET"])
+def get_building(id_building):
+    building = Building.query.filter_by(id_building=id_building, is_deleted=False).first()
+    if building is None:
+        return jsonify({"error": "Building not found"}), 404
+
+    return jsonify(serialize_building(building))
+
+
+@main.route("/api/buildings", methods=["POST"])
+def create_building():
+    data = request.get_json()
+    if not data or not str(data.get("name", "")).strip() or data.get("floor_count") in (None, ""):
+        return jsonify({"error": "Fields 'name' and 'floor_count' are required"}), 400
+
+    floor_count, error = parse_floor_count(data["floor_count"])
+    if error:
+        return jsonify({"error": error}), 400
+
+    building = Building(name=data["name"].strip(), floor_count=floor_count, is_deleted=False)
+    db.session.add(building)
+    db.session.commit()
+
+    return jsonify(serialize_building(building)), 201
+
+
+@main.route("/api/buildings/<id_building>", methods=["PUT"])
+def update_building(id_building):
+    building = Building.query.filter_by(id_building=id_building, is_deleted=False).first()
+    if building is None:
+        return jsonify({"error": "Building not found"}), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body is required"}), 400
+
+    if "name" in data:
+        if not str(data["name"]).strip():
+            return jsonify({"error": "Field 'name' cannot be empty"}), 400
+        building.name = data["name"].strip()
+
+    if "floor_count" in data:
+        floor_count, error = parse_floor_count(data["floor_count"])
+        if error:
+            return jsonify({"error": error}), 400
+
+        # Never remove a floor that still hosts devices.
+        highest_used_floor = max(
+            (d.floor for d in building.devices if not d.is_deleted and d.floor is not None),
+            default=0,
+        )
+        if floor_count < highest_used_floor:
+            return jsonify({
+                "error": f"Cannot reduce to {floor_count} floor(s): devices are still located on floor {highest_used_floor}"
+            }), 409
+
+        building.floor_count = floor_count
+
+    db.session.commit()
+
+    return jsonify(serialize_building(building)), 200
+
+
+@main.route("/api/buildings/<id_building>", methods=["DELETE"])
+def delete_building(id_building):
+    building = Building.query.filter_by(id_building=id_building, is_deleted=False).first()
+    if building is None:
+        return jsonify({"error": "Building not found"}), 404
+
+    active_devices = [d for d in building.devices if not d.is_deleted]
+    if active_devices:
+        return jsonify({
+            "error": f"Cannot delete: {len(active_devices)} device(s) are still located in this building"
+        }), 409
+
+    building.is_deleted = True
+    db.session.commit()
+
+    return jsonify({"message": "Building deleted"}), 200
 
 
 # ============================================================
@@ -735,6 +895,7 @@ def get_instance_data_samples(id_instance):
 # ============================================================
 # RISK CLASSIFICATIONS (read-only reference list)
 # ============================================================
+
 @main.route("/api/risk-classifications", methods=["GET"])
 def get_risk_classifications():
     bands = [

@@ -1,7 +1,7 @@
 import { Component, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
@@ -19,12 +19,17 @@ export class Login {
   constructor(
     private authService: AuthService,
     private router: Router,
+    private route: ActivatedRoute,
     private cdr: ChangeDetectorRef
-  ) {}
+  ) {
+    if (this.route.snapshot.queryParamMap.get('expired')) {
+      this.error = 'Your session has expired. Please log in again.';
+    }
+  }
 
   submit() {
     if (!this.username.trim() || !this.password.trim()) {
-      this.error = "Username and password are required.";
+      this.error = 'Username and password are required.';
       return;
     }
 
@@ -37,7 +42,7 @@ export class Login {
       },
       error: () => {
         this.loading = false;
-        this.error = "Invalid username or password.";
+        this.error = 'Invalid username or password.';
         this.cdr.detectChanges();
       }
     });

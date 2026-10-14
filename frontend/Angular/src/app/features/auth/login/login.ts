@@ -13,6 +13,7 @@ import { AuthService } from '../../../core/services/auth.service';
 export class Login {
   username = '';
   password = '';
+  showPassword = false;
   error: string | null = null;
   loading = false;
 

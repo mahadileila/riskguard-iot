@@ -44,104 +44,32 @@
     <!-- FILTERS -->
     <!-- ========================= -->
 
-    <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+    <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
 
-      <!-- Buildings -->
+      <div class="flex flex-wrap items-end gap-4">
 
-      <div class="flex flex-wrap items-center gap-2">
+        <app-filter-combo-box
+          label="Building"
+          allLabel="All buildings"
+          [options]="buildingOptions"
+          [selected]="selectedBuildingId"
+          (selectedChange)="selectBuilding($event)" />
 
-        <span class="w-16 text-xs font-semibold uppercase tracking-wide text-gray-400">
-          Building
-        </span>
+        <app-filter-combo-box
+          label="Floor"
+          allLabel="All floors"
+          [options]="floorOptions"
+          [selected]="selectedFloorValue"
+          [disabled]="!selectedBuilding"
+          (selectedChange)="onFloorSelected($event)" />
 
-        <button
-          type="button"
-          (click)="selectBuilding(null)"
-          class="rounded-full border px-3 py-1.5 text-sm font-medium transition"
-          [class]="selectedBuildingId === null
-            ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-            : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'"
-        >
-          All buildings
-          <span class="ml-1 opacity-70">{{ devices.length }}</span>
-        </button>
-
-        @for (b of buildingRows; track b.id) {
-
-          <button
-            type="button"
-            (click)="selectBuilding(b.id)"
-            class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition"
-            [class]="selectedBuildingId === b.id
-              ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-              : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'"
-          >
-            <span
-              class="inline-block h-2 w-2 rounded-full ring-2 ring-white/70"
-              [style.background-color]="hex(b.classification?.color)"
-            ></span>
-            {{ b.name }}
-            <span class="opacity-70">{{ b.deviceCount }}</span>
-          </button>
-
-        }
+        <p class="ml-auto pb-2 text-xs text-gray-500">
+          Showing
+          <span class="font-medium text-gray-700">{{ scopeLabel }}</span>
+          · {{ totalDevices }} {{ totalDevices === 1 ? 'device' : 'devices' }}
+        </p>
 
       </div>
-
-      <!-- Floors (only when a real building is selected) -->
-
-      @if (selectedBuilding) {
-
-        <div class="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
-
-          <span class="w-16 text-xs font-semibold uppercase tracking-wide text-gray-400">
-            Floor
-          </span>
-
-          <button
-            type="button"
-            (click)="selectFloor(null)"
-            class="rounded-full border px-3 py-1.5 text-sm font-medium transition"
-            [class]="selectedFloor === null
-              ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-              : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'"
-          >
-            All floors
-          </button>
-
-          @for (f of floorRowsAsc; track f.floor) {
-
-            <button
-              type="button"
-              (click)="selectFloor(f.floor)"
-              class="inline-flex h-9 min-w-9 items-center justify-center gap-1.5 rounded-full border px-3 text-sm font-medium transition"
-              [attr.title]="floorLabel(f.floor) + ' · ' + f.deviceCount + ' device(s)'"
-              [class]="selectedFloor === f.floor
-                ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                : f.deviceCount === 0
-                  ? 'border-dashed border-gray-200 bg-white text-gray-400 hover:bg-gray-50'
-                  : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'"
-            >
-              {{ floorShort(f.floor) }}
-              @if (f.deviceCount > 0) {
-                <span
-                  class="inline-block h-2 w-2 rounded-full"
-                  [style.background-color]="hex(f.classification?.color)"
-                ></span>
-              }
-            </button>
-
-          }
-
-        </div>
-
-      }
-
-      <p class="text-xs text-gray-500">
-        Showing
-        <span class="font-medium text-gray-700">{{ scopeLabel }}</span>
-        · {{ totalDevices }} {{ totalDevices === 1 ? 'device' : 'devices' }}
-      </p>
 
     </section>
 
@@ -200,7 +128,7 @@
             Risk by floor · click a floor to filter
           </p>
 
-          <div class="space-y-1.5">
+          <div class="max-h-[28rem] space-y-1.5 overflow-y-auto pr-1">
 
             @for (f of floorRows; track f.floor) {
 
@@ -254,7 +182,7 @@
 
           } @else {
 
-            <div class="space-y-1">
+            <div class="max-h-[28rem] space-y-1 overflow-y-auto pr-1">
 
               @for (b of buildingRows; track b.id) {
 

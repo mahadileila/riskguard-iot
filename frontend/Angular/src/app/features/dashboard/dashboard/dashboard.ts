@@ -5,6 +5,7 @@ import { forkJoin } from 'rxjs';
 import { Chart, registerables } from 'chart.js';
 import { DashboardService } from '../../../core/services/dashboard.service';
 import { DashboardBuilding, DashboardDevice, RiskLabel } from '../../../core/models/dashboard.model';
+import { FilterComboBox, FilterOption } from '../../../shared/components/filter-combo-box/filter-combo-box';
 
 Chart.register(...registerables);
 
@@ -41,7 +42,7 @@ interface SubsystemRow {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, FilterComboBox],
   templateUrl: './dashboard.html'
 })
 export class Dashboard implements OnInit, OnDestroy {
@@ -67,9 +68,13 @@ export class Dashboard implements OnInit, OnDestroy {
   averageClassification: RiskLabel | null = null;
   buildingRows: BuildingRow[] = [];
   floorRows: FloorRow[] = [];        // top floor first (building cross-section)
-  floorRowsAsc: FloorRow[] = [];     // ground first (filter chips)
+  floorRowsAsc: FloorRow[] = [];     // ground first (filter dropdown)
   subsystemRows: SubsystemRow[] = [];
   visibleDevices: DashboardDevice[] = [];
+
+  // Options for the dropdown filters
+  buildingOptions: FilterOption[] = [];
+  floorOptions: FilterOption[] = [];
 
   private filteredDevices: DashboardDevice[] = [];
   private chart: Chart | null = null;
@@ -112,9 +117,15 @@ export class Dashboard implements OnInit, OnDestroy {
     this.refresh();
   }
 
+  // Used by the floor cross-section: clicking the active floor again clears it
   selectFloor(floor: number | null) {
-    // clicking the active floor again clears it
     this.selectedFloor = this.selectedFloor === floor ? null : floor;
+    this.refresh();
+  }
+
+  // Used by the floor dropdown: direct selection (value is a string or null)
+  onFloorSelected(value: string | null) {
+    this.selectedFloor = value === null ? null : Number(value);
     this.refresh();
   }
 
@@ -143,6 +154,10 @@ export class Dashboard implements OnInit, OnDestroy {
 
   get selectedBuilding(): DashboardBuilding | null {
     return this.buildings.find(b => b.id_building === this.selectedBuildingId) ?? null;
+  }
+
+  get selectedFloorValue(): string | null {
+    return this.selectedFloor === null ? null : String(this.selectedFloor);
   }
 
   get scopeLabel(): string {
@@ -288,6 +303,21 @@ export class Dashboard implements OnInit, OnDestroy {
       });
     }
     this.floorRowsAsc = [...this.floorRows].reverse();
+
+    // Options for the dropdown filters
+    this.buildingOptions = this.buildingRows.map(b => ({
+      value: b.id,
+      label: b.name,
+      count: b.deviceCount,
+      color: this.hex(b.classification?.color),
+    }));
+
+    this.floorOptions = this.floorRowsAsc.map(f => ({
+      value: String(f.floor),
+      label: this.floorLabel(f.floor),
+      count: f.deviceCount,
+      color: f.deviceCount > 0 ? this.hex(f.classification?.color) : undefined,
+    }));
 
     // Device list
     const list = this.onlyAtRisk

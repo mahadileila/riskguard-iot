@@ -1,16 +1,21 @@
+export interface RiskLabel {
+  label: string;
+  color: string;
+}
+
 export interface DashboardDeviceSummary {
   id_device: string;
   name: string;
   subsystem_name: string | null;
   active_instances_count?: number;
   normalized_score: number;
-  classification: { label: string; color: string };
+  classification: RiskLabel;
 }
 
 export interface SubsystemRisk {
   subsystem_name: string;
   average_score: number;
-  classification: { label: string; color: string };
+  classification: RiskLabel;
 }
 
 export interface DashboardSummary {
@@ -27,4 +32,25 @@ export interface DashboardSummary {
 export interface RiskTrendPoint {
   date: string;
   avg_score: number;
+}
+
+// Shape of GET /api/devices (only the fields the dashboard needs)
+export interface DashboardDevice {
+  id_device: string;
+  name: string;
+  subsystem_name: string | null;
+  active_instances_count: number;
+  normalized_score: number;
+  classification: RiskLabel;
+  id_building: string | null;
+  building_name: string | null;
+  floor: number | null;
+  zone: string | null;
+}
+
+// Shape of GET /api/buildings
+export interface DashboardBuilding {
+  id_building: string;
+  name: string;
+  floor_count: number;
 }

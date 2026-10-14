@@ -1,6 +1,11 @@
 import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
-import { DashboardSummary, RiskTrendPoint } from '../models/dashboard.model';
+import {
+  DashboardSummary,
+  RiskTrendPoint,
+  DashboardDevice,
+  DashboardBuilding,
+} from '../models/dashboard.model';
 
 @Injectable({ providedIn: 'root' })
 export class DashboardService {
@@ -12,5 +17,14 @@ export class DashboardService {
 
   getRiskTrend() {
     return this.api.get<RiskTrendPoint[]>('/dashboard/risk-trend');
+  }
+
+  // New: the dashboard now filters client-side, so it needs the raw lists.
+  getDevices() {
+    return this.api.get<DashboardDevice[]>('/devices');
+  }
+
+  getBuildings() {
+    return this.api.get<DashboardBuilding[]>('/buildings');
   }
 }

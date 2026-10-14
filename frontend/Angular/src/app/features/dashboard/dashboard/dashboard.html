@@ -1,12 +1,30 @@
-<div class="p-6">
+<div class="p-6 space-y-6">
 
-  <h1 class="text-2xl font-semibold text-gray-900">
-    Overview
-  </h1>
+  <!-- Header -->
 
-  <p class="text-gray-500 text-sm mb-6">
-    Overview of monitored IoT devices and privacy risk exposure
-  </p>
+  <div class="flex flex-wrap items-end justify-between gap-3">
+
+    <div>
+      <h1 class="text-2xl font-semibold text-gray-900">
+        Overview
+      </h1>
+
+      <p class="text-gray-500 text-sm">
+        Overview of monitored IoT devices and privacy risk exposure
+      </p>
+    </div>
+
+    @if (!loading && hasActiveFilter) {
+      <button
+        type="button"
+        (click)="clearFilters()"
+        class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+      >
+        Reset filters
+      </button>
+    }
+
+  </div>
 
   @if (loading) {
 
@@ -20,70 +38,369 @@
       {{ error }}
     </p>
 
-  } @else if (summary) {
+  } @else {
 
-    <!-- Summary cards -->
+    <!-- ========================= -->
+    <!-- FILTERS -->
+    <!-- ========================= -->
 
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+    <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
 
-      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+      <!-- Buildings -->
+
+      <div class="flex flex-wrap items-center gap-2">
+
+        <span class="w-16 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          Building
+        </span>
+
+        <button
+          type="button"
+          (click)="selectBuilding(null)"
+          class="rounded-full border px-3 py-1.5 text-sm font-medium transition"
+          [class]="selectedBuildingId === null
+            ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+            : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'"
+        >
+          All buildings
+          <span class="ml-1 opacity-70">{{ devices.length }}</span>
+        </button>
+
+        @for (b of buildingRows; track b.id) {
+
+          <button
+            type="button"
+            (click)="selectBuilding(b.id)"
+            class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition"
+            [class]="selectedBuildingId === b.id
+              ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+              : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'"
+          >
+            <span
+              class="inline-block h-2 w-2 rounded-full ring-2 ring-white/70"
+              [style.background-color]="hex(b.classification?.color)"
+            ></span>
+            {{ b.name }}
+            <span class="opacity-70">{{ b.deviceCount }}</span>
+          </button>
+
+        }
+
+      </div>
+
+      <!-- Floors (only when a real building is selected) -->
+
+      @if (selectedBuilding) {
+
+        <div class="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
+
+          <span class="w-16 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Floor
+          </span>
+
+          <button
+            type="button"
+            (click)="selectFloor(null)"
+            class="rounded-full border px-3 py-1.5 text-sm font-medium transition"
+            [class]="selectedFloor === null
+              ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+              : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'"
+          >
+            All floors
+          </button>
+
+          @for (f of floorRowsAsc; track f.floor) {
+
+            <button
+              type="button"
+              (click)="selectFloor(f.floor)"
+              class="inline-flex h-9 min-w-9 items-center justify-center gap-1.5 rounded-full border px-3 text-sm font-medium transition"
+              [attr.title]="floorLabel(f.floor) + ' · ' + f.deviceCount + ' device(s)'"
+              [class]="selectedFloor === f.floor
+                ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                : f.deviceCount === 0
+                  ? 'border-dashed border-gray-200 bg-white text-gray-400 hover:bg-gray-50'
+                  : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'"
+            >
+              {{ floorShort(f.floor) }}
+              @if (f.deviceCount > 0) {
+                <span
+                  class="inline-block h-2 w-2 rounded-full"
+                  [style.background-color]="hex(f.classification?.color)"
+                ></span>
+              }
+            </button>
+
+          }
+
+        </div>
+
+      }
+
+      <p class="text-xs text-gray-500">
+        Showing
+        <span class="font-medium text-gray-700">{{ scopeLabel }}</span>
+        · {{ totalDevices }} {{ totalDevices === 1 ? 'device' : 'devices' }}
+      </p>
+
+    </section>
+
+    <!-- ========================= -->
+    <!-- SUMMARY CARDS -->
+    <!-- ========================= -->
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
+      <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <p class="text-sm text-gray-500">Total devices</p>
-        <p class="text-3xl font-semibold text-blue-600">{{ summary.total_devices }}</p>
+        <p class="mt-1 text-3xl font-semibold text-blue-600">{{ totalDevices }}</p>
       </div>
 
-      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+      <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <p class="text-sm text-gray-500">High risk devices</p>
-        <p class="text-3xl font-semibold text-red-600">{{ summary.high_risk_devices_count }}</p>
+        <p class="mt-1 text-3xl font-semibold text-red-600">{{ highRiskCount }}</p>
       </div>
 
-      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+      <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <p class="text-sm text-gray-500">Requiring attention</p>
+        <p class="mt-1 text-3xl font-semibold text-amber-500">{{ attentionCount }}</p>
+        <p class="mt-1 text-xs text-gray-400">Medium or High risk</p>
+      </div>
+
+      <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <p class="text-sm text-gray-500">Average score</p>
-        <p class="text-3xl font-semibold text-gray-900">{{ summary.average_score }}</p>
+        <p class="mt-1 text-3xl font-semibold text-gray-900">{{ averageScore }}</p>
+        <div class="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+          <div
+            class="h-full rounded-full transition-all duration-500"
+            [style.width.%]="averageScore"
+            [style.background-color]="hex(averageClassification?.color)"
+          ></div>
+        </div>
       </div>
 
     </div>
 
-    <!-- Risk distribution by subsystem -->
+    <!-- ========================= -->
+    <!-- LOCATION BREAKDOWN + SUBSYSTEM CHART -->
+    <!-- ========================= -->
 
-    <div class="border border-gray-200 rounded-lg p-4 mb-8">
-      <h2 class="text-lg font-semibold text-gray-900 mb-3">
-        Risk distribution by subsystem
-      </h2>
-      <canvas #subsystemChartCanvas></canvas>
+    <div class="grid grid-cols-1 gap-6 xl:grid-cols-5">
+
+      <!-- Left: risk by building, or floor-by-floor cross-section -->
+
+      <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm xl:col-span-2">
+
+        @if (selectedBuilding) {
+
+          <h2 class="text-lg font-semibold text-gray-900">
+            {{ selectedBuilding.name }}
+          </h2>
+          <p class="mb-3 text-xs text-gray-500">
+            Risk by floor · click a floor to filter
+          </p>
+
+          <div class="space-y-1.5">
+
+            @for (f of floorRows; track f.floor) {
+
+              <button
+                type="button"
+                (click)="selectFloor(f.floor)"
+                class="flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition"
+                [class]="selectedFloor === f.floor
+                  ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500'
+                  : 'border-gray-200 bg-white hover:bg-gray-50'"
+              >
+                <span class="w-24 shrink-0 text-xs font-semibold text-gray-600">
+                  {{ floorLabel(f.floor) }}
+                </span>
+
+                <div class="h-3 flex-1 overflow-hidden rounded-full bg-gray-100">
+                  <div
+                    class="h-full rounded-full transition-all duration-500"
+                    [style.width.%]="f.average ?? 0"
+                    [style.background-color]="hex(f.classification?.color)"
+                  ></div>
+                </div>
+
+                <span class="w-24 shrink-0 text-right text-xs text-gray-500">
+                  @if (f.deviceCount === 0) {
+                    No devices
+                  } @else {
+                    {{ f.deviceCount }} · {{ f.average ?? '—' }}
+                  }
+                </span>
+              </button>
+
+            }
+
+          </div>
+
+        } @else if (selectedBuildingId === null) {
+
+          <h2 class="text-lg font-semibold text-gray-900">
+            Risk by building
+          </h2>
+          <p class="mb-3 text-xs text-gray-500">
+            Average score · click a building to drill down
+          </p>
+
+          @if (buildingRows.length === 0) {
+
+            <p class="py-4 text-sm text-gray-500">
+              No buildings yet.
+            </p>
+
+          } @else {
+
+            <div class="space-y-1">
+
+              @for (b of buildingRows; track b.id) {
+
+                <button
+                  type="button"
+                  (click)="selectBuilding(b.id)"
+                  class="w-full rounded-lg border border-transparent px-3 py-2.5 text-left transition hover:border-gray-200 hover:bg-gray-50"
+                >
+                  <div class="mb-1.5 flex items-center justify-between gap-3">
+                    <span class="truncate text-sm font-medium text-gray-900">{{ b.name }}</span>
+                    <span class="shrink-0 text-xs text-gray-500">
+                      {{ b.deviceCount }} {{ b.deviceCount === 1 ? 'device' : 'devices' }} · {{ b.average ?? '—' }}
+                    </span>
+                  </div>
+
+                  <div class="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      class="h-full rounded-full transition-all duration-500"
+                      [style.width.%]="b.average ?? 0"
+                      [style.background-color]="hex(b.classification?.color)"
+                    ></div>
+                  </div>
+                </button>
+
+              }
+
+            </div>
+
+          }
+
+        } @else {
+
+          <h2 class="text-lg font-semibold text-gray-900">
+            Unassigned devices
+          </h2>
+          <p class="py-4 text-sm text-gray-500">
+            These devices have no building or floor yet. Edit them from the Devices page to place them.
+          </p>
+
+        }
+
+      </section>
+
+      <!-- Right: risk distribution by subsystem -->
+
+      <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm xl:col-span-3">
+
+        <h2 class="text-lg font-semibold text-gray-900">
+          Risk distribution by subsystem
+        </h2>
+        <p class="mb-3 text-xs text-gray-500">
+          {{ scopeLabel }}
+        </p>
+
+        <div class="relative h-72">
+          <canvas #subsystemChartCanvas></canvas>
+
+          @if (subsystemRows.length === 0) {
+            <div class="absolute inset-0 flex items-center justify-center rounded-lg bg-white/90 text-sm text-gray-500">
+              No devices with collected data in this selection.
+            </div>
+          }
+        </div>
+
+      </section>
+
     </div>
 
-    <!-- Devices requiring attention -->
+    <!-- ========================= -->
+    <!-- DEVICES LIST -->
+    <!-- ========================= -->
 
-    <div class="border border-gray-200 rounded-lg p-4">
+    <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
 
-      <h2 class="text-lg font-semibold text-gray-900 mb-3">
-        Devices requiring attention
-      </h2>
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
 
-      @if (summary.devices_requiring_attention.length === 0) {
+        <h2 class="text-lg font-semibold text-gray-900">
+          {{ onlyAtRisk ? 'Devices requiring attention' : 'All devices in selection' }}
+        </h2>
 
-        <p class="text-gray-500 text-sm py-4">
-          No devices currently at Medium or High risk.
+        <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm">
+          <button
+            type="button"
+            (click)="setOnlyAtRisk(true)"
+            class="rounded-md px-3 py-1 font-medium transition"
+            [class]="onlyAtRisk ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+          >
+            At risk
+          </button>
+          <button
+            type="button"
+            (click)="setOnlyAtRisk(false)"
+            class="rounded-md px-3 py-1 font-medium transition"
+            [class]="!onlyAtRisk ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+          >
+            All
+          </button>
+        </div>
+
+      </div>
+
+      @if (visibleDevices.length === 0) {
+
+        <p class="py-4 text-sm text-gray-500">
+          {{ onlyAtRisk ? 'No devices at Medium or High risk in this selection.' : 'No devices in this selection.' }}
         </p>
 
       } @else {
 
         <div class="divide-y divide-gray-100">
 
-          @for (d of summary.devices_requiring_attention; track d.id_device) {
+          @for (d of visibleDevices; track d.id_device) {
 
             <a
               [routerLink]="['/devices', d.id_device]"
-              class="flex items-center justify-between py-3 hover:bg-gray-50 px-2 -mx-2 rounded"
+              class="flex flex-col gap-2 rounded px-2 py-3 hover:bg-gray-50 sm:flex-row sm:items-center sm:gap-4"
             >
-              <span class="text-sm text-gray-900">{{ d.name }}</span>
-              <span class="text-sm text-gray-500">{{ d.subsystem_name || '—' }}</span>
-              <span
-                class="inline-block px-2.5 py-1 rounded-full text-xs font-medium text-white"
-                [style.background-color]="d.classification.color"
-              >
-                {{ d.classification.label }}
-              </span>
+              <div class="min-w-0 sm:w-1/3">
+                <p class="truncate text-sm font-medium text-gray-900">{{ d.name }}</p>
+                <p class="truncate text-xs text-gray-500">{{ d.subsystem_name || '—' }}</p>
+              </div>
+
+              <p class="truncate text-sm text-gray-500 sm:w-1/3">
+                {{ locationLabel(d) }}
+              </p>
+
+              <div class="flex flex-1 items-center gap-3">
+                <div class="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
+                  <div
+                    class="h-full rounded-full transition-all duration-500"
+                    [style.width.%]="d.normalized_score"
+                    [style.background-color]="hex(d.classification.color)"
+                  ></div>
+                </div>
+
+                <span class="w-10 text-right text-sm tabular-nums text-gray-700">
+                  {{ d.normalized_score }}
+                </span>
+
+                <span
+                  class="inline-block w-20 rounded-full px-2.5 py-1 text-center text-xs font-medium ring-1 ring-inset"
+                  [class]="badgeClass(d.classification.label)"
+                >
+                  {{ d.classification.label }}
+                </span>
+              </div>
             </a>
 
           }
@@ -92,7 +409,7 @@
 
       }
 
-    </div>
+    </section>
 
   }
 

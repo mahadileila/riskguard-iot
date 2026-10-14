@@ -5,8 +5,10 @@ import { RouterLink } from '@angular/router';
 import { Notification, NotificationType } from '../../../shared/components/notification/notification';
 import { DeviceService } from '../../../core/services/device.service';
 import { DeviceTypeService } from '../../../core/services/device-type.service';
+import { BuildingService } from '../../../core/services/building.service';
 import { Device } from '../../../core/models/device.model';
 import { DeviceType } from '../../../core/models/device-type.model';
+import { Building } from '../../../core/models/building.model';
 
 @Component({
   selector: 'app-device-list',
@@ -17,6 +19,8 @@ import { DeviceType } from '../../../core/models/device-type.model';
 export class DeviceList implements OnInit {
   devices: Device[] = [];
   deviceTypes: DeviceType[] = [];
+  buildings: Building[] = [];
+  floors: number[] = [];
   searchTerm = '';
   loading = true;
 
@@ -27,6 +31,9 @@ export class DeviceList implements OnInit {
   editingId: string | null = null;
   formName = '';
   formDeviceTypeId = '';
+  formBuildingId = '';
+  formFloor: number | null = null;
+  formZone = '';
 
   showDeleteForm = false;
   deviceToDelete: Device | null = null;
@@ -34,11 +41,13 @@ export class DeviceList implements OnInit {
   constructor(
     private deviceService: DeviceService,
     private deviceTypeService: DeviceTypeService,
+    private buildingService: BuildingService,
     private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
     this.loadData();
+    this.loadBuildings();
   }
 
   get filteredDevices(): Device[] {
@@ -87,10 +96,41 @@ export class DeviceList implements OnInit {
     });
   }
 
+  // Independent from loadData(): a failure here must never block the device list.
+  loadBuildings() {
+    this.buildingService.getBuildings().subscribe({
+      next: (buildings) => {
+        this.buildings = buildings;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.showNotification('error', "Unable to load buildings.");
+      }
+    });
+  }
+
+  // Builds the list of selectable floors (1..floor_count) for the selected building.
+  private updateFloors() {
+    const building = this.buildings.find(b => b.id_building === this.formBuildingId);
+    this.floors = building
+      ? Array.from({ length: building.floor_count }, (_, i) => i + 1)
+      : [];
+    this.cdr.detectChanges();
+  }
+
+  onBuildingChange() {
+    this.formFloor = null;
+    this.updateFloors();
+  }
+
   openAddForm() {
     this.editingId = null;
     this.formName = '';
     this.formDeviceTypeId = '';
+    this.formBuildingId = '';
+    this.formFloor = null;
+    this.formZone = '';
+    this.floors = [];
     this.showForm = true;
   }
 
@@ -98,6 +138,11 @@ export class DeviceList implements OnInit {
     this.editingId = device.id_device;
     this.formName = device.name;
     this.formDeviceTypeId = device.id_device_type;
+    this.formBuildingId = device.id_building ?? '';
+    this.updateFloors();
+    // Devices created before buildings existed have no floor yet.
+    this.formFloor = device.floor ?? null;
+    this.formZone = device.zone ?? '';
     this.showForm = true;
   }
 
@@ -106,16 +151,21 @@ export class DeviceList implements OnInit {
   }
 
   saveDevice() {
-    if (!this.formName.trim() || !this.formDeviceTypeId) {
+    if (!this.formName.trim() || !this.formDeviceTypeId || !this.formBuildingId || this.formFloor === null) {
       this.showForm = false;
-      this.showNotification('error', "Name and Device Type are required.");
+      this.showNotification('error', "Name, Device Type, Building and Floor are required.");
       return;
     }
 
     const payload = {
       name: this.formName,
-      id_device_type: this.formDeviceTypeId
+      id_device_type: this.formDeviceTypeId,
+      id_building: this.formBuildingId,
+      floor: this.formFloor,
+      zone: this.formZone.trim() || null
     };
+
+    const wasEditing = !!this.editingId;
 
     const request = this.editingId
       ? this.deviceService.updateDevice(this.editingId, payload)
@@ -125,11 +175,11 @@ export class DeviceList implements OnInit {
       next: () => {
         this.showForm = false;
         this.loadData();
-        this.showNotification('success', this.editingId ? "Device updated." : "Device created.");
+        this.showNotification('success', wasEditing ? "Device updated." : "Device created.");
       },
-      error: () => {
+      error: (err) => {
         this.showForm = false;
-        this.showNotification('error', "Error while saving.");
+        this.showNotification('error', err.error?.error ?? "Error while saving.");
       }
     });
   }
@@ -166,12 +216,15 @@ export class DeviceList implements OnInit {
   }
 
   exportToCsv() {
-    const headers = ['Device Name', 'Type', 'Subsystem', 'Risk Score', 'Level'];
+    const headers = ['Device Name', 'Type', 'Subsystem', 'Building', 'Floor', 'Position', 'Risk Score', 'Level'];
 
     const rows = this.filteredDevices.map(d => [
       d.name,
       d.device_type_name || '',
       d.subsystem_name || '',
+      d.building_name || '',
+      d.floor !== null && d.floor !== undefined ? d.floor.toString() : '',
+      d.zone || '',
       d.active_instances_count > 0 ? d.normalized_score.toString() : '',
       d.active_instances_count > 0 ? d.classification.label : 'No Risk',
     ]);
@@ -180,9 +233,7 @@ export class DeviceList implements OnInit {
       .map(row => row.map(cell => this.escapeCsvCell(cell)).join(','))
       .join('\n');
 
-    // Prepend a UTF-8 BOM so Excel opens accented characters correctly
-    // instead of showing garbled text.
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+     const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' });
 
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -193,10 +244,7 @@ export class DeviceList implements OnInit {
   }
 
   private escapeCsvCell(value: string): string {
-    // Wrap in quotes and escape any embedded quotes, so names/values
-    // containing commas or quotes don't break the CSV structure.
-    const escaped = value.replace(/"/g, '""');
+     const escaped = value.replace(/"/g, '""');
     return `"${escaped}"`;
   }
 }
-

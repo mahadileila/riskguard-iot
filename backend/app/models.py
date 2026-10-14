@@ -63,6 +63,20 @@ class DeviceType(db.Model):
         return f"<DeviceType {self.name}>"
 
 
+class Building(db.Model):
+    __tablename__ = "BUILDING"
+
+    id_building = db.Column(db.String(36), primary_key=True, default=generate_uuid)
+    name = db.Column(db.String(100), nullable=False)
+    floor_count = db.Column(db.Integer, nullable=False, default=1, server_default="1")
+    is_deleted = db.Column(db.Boolean, nullable=False, default=False)
+
+    devices = db.relationship("Device", backref="building", lazy=True)
+
+    def __repr__(self):
+        return f"<Building {self.name} ({self.floor_count} floors)>"
+
+
 class Device(db.Model):
     __tablename__ = "DEVICE"
 
@@ -73,10 +87,15 @@ class Device(db.Model):
     id_device_type = db.Column(
         db.String(36), db.ForeignKey("DEVICE_TYPE.id_device_type"), nullable=False
     )
+    id_building = db.Column(
+        db.String(36), db.ForeignKey("BUILDING.id_building"), nullable=True
+    )
+    floor = db.Column(db.Integer, nullable=True)
+    zone = db.Column(db.String(50), nullable=True)
 
     instances = db.relationship("CollectionInstance", backref="device", lazy=True)
     score_history = db.relationship("RiskScoreHistory", backref="device", lazy=True)
-    
+
     def __repr__(self):
         return f"<Device {self.name}>"
 
@@ -100,6 +119,7 @@ class CollectionInstance(db.Model):
 
     def __repr__(self):
         return f"<CollectionInstance {self.data_description}>"
+
 
 class InstanceFactorScore(db.Model):
     __tablename__ = "INSTANCE_FACTOR_SCORE"
@@ -131,6 +151,7 @@ class DeviceDataSample(db.Model):
 
     def __repr__(self):
         return f"<DeviceDataSample {self.data_value}>"
+
 
 class RiskScoreHistory(db.Model):
     __tablename__ = "RISK_SCORE_HISTORY"

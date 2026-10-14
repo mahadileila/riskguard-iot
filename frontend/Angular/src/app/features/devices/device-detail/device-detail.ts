@@ -1,15 +1,14 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { CommonModule, Location } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { DeviceService } from '../../../core/services/device.service';
 import { Device } from '../../../core/models/device.model';
 import { CollectionInstance } from '../../../core/models/instance.model';
-import { Location } from '@angular/common';
 
 @Component({
   selector: 'app-device-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule],
   templateUrl: './device-detail.html'
 })
 export class DeviceDetail implements OnInit {
@@ -27,7 +26,6 @@ export class DeviceDetail implements OnInit {
     private cdr: ChangeDetectorRef
   ) {}
 
-  // nouvelle méthode :
   goBack() {
     this.location.back();
   }
@@ -77,10 +75,17 @@ export class DeviceDetail implements OnInit {
       .sort((a, b) => new Date(b.captured_at).getTime() - new Date(a.captured_at).getTime());
   }
 
+  // "Building A - Main Tower · Floor 2 · Open space", or an em dash for devices without a location
+  get locationLabel(): string {
+    if (!this.device?.building_name) return '—';
+    const parts = [this.device.building_name, `Floor ${this.device.floor}`];
+    if (this.device.zone) parts.push(this.device.zone);
+    return parts.join(' · ');
+  }
+
   setTab(tab: 'general' | 'instances' | 'samples') {
     this.activeTab = tab;
   }
-  
 
   private readonly ATTRIBUTE_LABELS: Record<string, string> = {
     // Data nature

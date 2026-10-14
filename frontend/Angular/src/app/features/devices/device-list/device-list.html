@@ -106,6 +106,10 @@
               </th>
 
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                Location
+              </th>
+
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">
                 Risk Score
               </th>
 
@@ -137,6 +141,14 @@
 
                 <td class="px-4 py-3 text-sm text-gray-600">
                   {{ d.subsystem_name || '—' }}
+                </td>
+
+                <td class="px-4 py-3 text-sm text-gray-600">
+                  @if (d.building_name) {
+                    {{ d.building_name }} · Floor {{ d.floor }}@if (d.zone) { · {{ d.zone }} }
+                  } @else {
+                    —
+                  }
                 </td>
 
                 <td class="px-4 py-3 text-sm text-gray-900">
@@ -224,6 +236,48 @@
             <option [value]="dt.id_device_type">{{ dt.name }}</option>
           }
         </select>
+
+        <label class="block text-sm text-gray-600 mb-1">
+          Building
+        </label>
+
+        <select
+          [(ngModel)]="formBuildingId"
+          (ngModelChange)="onBuildingChange()"
+          class="w-full border border-gray-300 rounded-md px-3 py-2 mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="" disabled>Select a building</option>
+          @for (b of buildings; track b.id_building) {
+            <option [value]="b.id_building">{{ b.name }}</option>
+          }
+        </select>
+
+        <label class="block text-sm text-gray-600 mb-1">
+          Floor
+        </label>
+
+        <select
+          [(ngModel)]="formFloor"
+          [disabled]="!formBuildingId"
+          class="w-full border border-gray-300 rounded-md px-3 py-2 mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400"
+        >
+          <option [ngValue]="null" disabled>
+            {{ formBuildingId ? 'Select a floor' : 'Select a building first' }}
+          </option>
+          @for (f of floors; track f) {
+            <option [ngValue]="f">Floor {{ f }}</option>
+          }
+        </select>
+
+        <label class="block text-sm text-gray-600 mb-1">
+          Position on the floor (optional)
+        </label>
+
+        <input
+          [(ngModel)]="formZone"
+          class="w-full border border-gray-300 rounded-md px-3 py-2 mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="e.g. Room 4, Corridor 2"
+        />
 
         <div class="flex justify-end gap-2">
 

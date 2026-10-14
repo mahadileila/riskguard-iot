@@ -898,10 +898,7 @@ def get_instance_data_samples(id_instance):
 
 @main.route("/api/risk-classifications", methods=["GET"])
 def get_risk_classifications():
-    bands = [
-        {"label": "No Risk", "min_score": None, "max_score": None, "color": "gray",
-         "description": "Device has no active collection instance"}
-    ]
+    bands = []
     for low, high, label, color in CLASSIFICATION_BANDS:
         bands.append({
             "label": label,

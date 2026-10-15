@@ -30,6 +30,7 @@ export class DeviceTypeList implements OnInit {
 
   showDeleteForm = false;
   deviceTypeToDelete: DeviceType | null = null;
+  selectedSubsystemId: string | null = null;
 
   constructor(
     private deviceTypeService: DeviceTypeService,
@@ -42,9 +43,17 @@ export class DeviceTypeList implements OnInit {
   }
 
   get filteredDeviceTypes(): DeviceType[] {
-    if (!this.searchTerm.trim()) return this.deviceTypes;
-    const term = this.searchTerm.toLowerCase();
-    return this.deviceTypes.filter(dt => dt.name.toLowerCase().includes(term));
+    const term = this.searchTerm.trim().toLowerCase();
+
+    return this.deviceTypes.filter(dt =>
+      (this.selectedSubsystemId === null || dt.id_subsystem === this.selectedSubsystemId) &&
+      (!term || dt.name.toLowerCase().includes(term))
+    );
+  }
+
+  resetFilters() {
+    this.searchTerm = '';
+    this.selectedSubsystemId = null;
   }
 
   subsystemName(id: string): string {

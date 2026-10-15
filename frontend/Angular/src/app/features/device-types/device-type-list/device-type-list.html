@@ -19,12 +19,36 @@
     </button>
   </div>
 
-  <input
-    type="text"
-    [(ngModel)]="searchTerm"
-    placeholder="Search device types..."
-    class="w-full max-w-sm border border-gray-300 rounded-md px-3 py-2 mb-4 text-sm"
-  />
+  <div class="mb-4 flex flex-wrap items-center gap-3">
+
+    <input
+      type="text"
+      [(ngModel)]="searchTerm"
+      placeholder="Search device types..."
+      class="w-full max-w-sm border border-gray-300 rounded-md px-3 py-2 text-sm"
+    />
+
+    <select
+      [(ngModel)]="selectedSubsystemId"
+      class="border border-gray-300 rounded-md bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+    >
+      <option [ngValue]="null">All subsystems</option>
+      @for (s of subsystems; track s.id_subsystem) {
+        <option [ngValue]="s.id_subsystem">{{ s.name }}</option>
+      }
+    </select>
+
+    @if (selectedSubsystemId !== null || searchTerm) {
+      <button
+        type="button"
+        (click)="resetFilters()"
+        class="text-sm text-blue-600 hover:underline"
+      >
+        Reset
+      </button>
+    }
+
+  </div>
 
   <!-- Notification -->
 
@@ -109,6 +133,14 @@
           </thead>
 
           <tbody class="divide-y divide-gray-100">
+
+            @if (filteredDeviceTypes.length === 0) {
+              <tr>
+                <td colspan="4" class="px-4 py-6 text-center text-sm text-gray-500">
+                  No device types match your filters.
+                </td>
+              </tr>
+            }
 
             @for (dt of filteredDeviceTypes; track dt.id_device_type) {
 

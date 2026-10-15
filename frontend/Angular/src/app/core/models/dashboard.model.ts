@@ -48,9 +48,14 @@ export interface DashboardDevice {
   zone: string | null;
 }
 
-// Shape of GET /api/buildings
 export interface DashboardBuilding {
   id_building: string;
   name: string;
   floor_count: number;
+}
+
+export interface ScoreHistoryPoint {
+  id_device: string;
+  date: string;
+  score: number;
 }

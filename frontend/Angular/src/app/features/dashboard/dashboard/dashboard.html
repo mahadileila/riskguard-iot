@@ -257,6 +257,56 @@
     </div>
 
     <!-- ========================= -->
+    <!-- RISK TREND -->
+    <!-- ========================= -->
+
+    <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900">
+            Risk trend
+          </h2>
+          <p class="text-xs text-gray-500">
+            Average score · {{ scopeLabel }}
+          </p>
+        </div>
+
+        <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm">
+          <button
+            type="button"
+            (click)="setTrendRange('30d')"
+            class="rounded-md px-3 py-1 font-medium transition"
+            [class]="trendRange === '30d' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+          >
+            30 days
+          </button>
+          <button
+            type="button"
+            (click)="setTrendRange('12m')"
+            class="rounded-md px-3 py-1 font-medium transition"
+            [class]="trendRange === '12m' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+          >
+            12 months
+          </button>
+        </div>
+
+      </div>
+
+      <div class="relative h-64">
+        <canvas #trendChartCanvas></canvas>
+
+        @if (trendPoints.length === 0) {
+          <div class="absolute inset-0 flex items-center justify-center rounded-lg bg-white/90 text-sm text-gray-500">
+            No score history for this selection.
+          </div>
+        }
+      </div>
+
+    </section>
+
+    <!-- ========================= -->
     <!-- DEVICES LIST -->
     <!-- ========================= -->
 

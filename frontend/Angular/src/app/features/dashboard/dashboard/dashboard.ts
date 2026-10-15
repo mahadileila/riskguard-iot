@@ -1,10 +1,11 @@
 import { Component, OnInit, OnDestroy, ChangeDetectorRef, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { Chart, registerables } from 'chart.js';
 import { DashboardService } from '../../../core/services/dashboard.service';
-import { DashboardBuilding, DashboardDevice, RiskLabel } from '../../../core/models/dashboard.model';
+import { DashboardBuilding, DashboardDevice, RiskLabel, ScoreHistoryPoint } from '../../../core/models/dashboard.model';
 import { FilterComboBox, FilterOption } from '../../../shared/components/filter-combo-box/filter-combo-box';
 
 Chart.register(...registerables);
@@ -17,6 +18,8 @@ const COLOR_HEX: Record<string, string> = {
   red: '#dc2626',
   gray: '#9ca3af',
 };
+
+type TrendRange = '30d' | '12m';
 
 interface BuildingRow {
   id: string;
@@ -39,6 +42,11 @@ interface SubsystemRow {
   classification: RiskLabel;
 }
 
+interface TrendPoint {
+  label: string;
+  average: number;
+}
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -47,10 +55,12 @@ interface SubsystemRow {
 })
 export class Dashboard implements OnInit, OnDestroy {
   @ViewChild('subsystemChartCanvas') subsystemChartCanvas?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('trendChartCanvas') trendChartCanvas?: ElementRef<HTMLCanvasElement>;
 
   // Raw data (loaded once)
   devices: DashboardDevice[] = [];
   buildings: DashboardBuilding[] = [];
+  history: ScoreHistoryPoint[] = [];
 
   loading = true;
   error: string | null = null;
@@ -59,6 +69,7 @@ export class Dashboard implements OnInit, OnDestroy {
   selectedBuildingId: string | null = null;
   selectedFloor: number | null = null;
   onlyAtRisk = true;
+  trendRange: TrendRange = '30d';
 
   // Derived data (recomputed whenever a filter changes)
   totalDevices = 0;
@@ -70,6 +81,7 @@ export class Dashboard implements OnInit, OnDestroy {
   floorRows: FloorRow[] = [];        // top floor first (building cross-section)
   floorRowsAsc: FloorRow[] = [];     // ground first (filter dropdown)
   subsystemRows: SubsystemRow[] = [];
+  trendPoints: TrendPoint[] = [];
   visibleDevices: DashboardDevice[] = [];
 
   // Options for the dropdown filters
@@ -78,6 +90,7 @@ export class Dashboard implements OnInit, OnDestroy {
 
   private filteredDevices: DashboardDevice[] = [];
   private chart: Chart | null = null;
+  private trendChart: Chart | null = null;
 
   constructor(
     private dashboardService: DashboardService,
@@ -88,14 +101,19 @@ export class Dashboard implements OnInit, OnDestroy {
     forkJoin({
       devices: this.dashboardService.getDevices(),
       buildings: this.dashboardService.getBuildings(),
+      history: this.dashboardService.getScoreHistory().pipe(
+        catchError(() => of([] as ScoreHistoryPoint[]))
+      ),
     }).subscribe({
-      next: ({ devices, buildings }) => {
+      next: ({ devices, buildings, history }) => {
         this.devices = devices;
         this.buildings = buildings;
+        this.history = history;
         this.recompute();
         this.loading = false;
         this.cdr.detectChanges();
         this.updateChart();
+        this.updateTrendChart();
       },
       error: () => {
         this.error = 'Unable to load dashboard data.';
@@ -107,6 +125,7 @@ export class Dashboard implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.chart?.destroy();
+    this.trendChart?.destroy();
   }
 
   // ---------- Filter actions ----------
@@ -140,10 +159,16 @@ export class Dashboard implements OnInit, OnDestroy {
     this.refresh();
   }
 
+  setTrendRange(range: TrendRange) {
+    this.trendRange = range;
+    this.refresh();
+  }
+
   private refresh() {
     this.recompute();
     this.cdr.detectChanges();
     this.updateChart();
+    this.updateTrendChart();
   }
 
   // ---------- Template helpers ----------
@@ -319,6 +344,9 @@ export class Dashboard implements OnInit, OnDestroy {
       color: f.deviceCount > 0 ? this.hex(f.classification?.color) : undefined,
     }));
 
+    // Risk trend (current selection)
+    this.trendPoints = this.computeTrend();
+
     // Device list
     const list = this.onlyAtRisk
       ? this.filteredDevices.filter(d => this.isScored(d) && ['Medium', 'High'].includes(d.classification.label))
@@ -326,7 +354,52 @@ export class Dashboard implements OnInit, OnDestroy {
     this.visibleDevices = [...list].sort((a, b) => b.normalized_score - a.normalized_score);
   }
 
-  // ---------- Chart ----------
+  // Average of the selected devices' snapshots: per day over 30 days, per month over 12 months
+  private computeTrend(): TrendPoint[] {
+    const ids = new Set(this.filteredDevices.filter(d => this.isScored(d)).map(d => d.id_device));
+    const monthly = this.trendRange === '12m';
+    const cutoff = this.trendCutoff(monthly);
+
+    const buckets = new Map<string, { sum: number; count: number }>();
+    for (const p of this.history) {
+      if (!ids.has(p.id_device) || p.date < cutoff) continue;
+      const key = monthly ? p.date.slice(0, 7) : p.date;
+      const bucket = buckets.get(key) ?? { sum: 0, count: 0 };
+      bucket.sum += p.score;
+      bucket.count += 1;
+      buckets.set(key, bucket);
+    }
+
+    return [...buckets.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, { sum, count }]) => ({
+        label: this.trendLabel(key, monthly),
+        average: Math.round((sum / count) * 100) / 100,
+      }));
+  }
+
+  private trendCutoff(monthly: boolean): string {
+    const date = new Date();
+    if (monthly) {
+      date.setUTCDate(1);
+      date.setUTCMonth(date.getUTCMonth() - 11);
+    } else {
+      date.setUTCDate(date.getUTCDate() - 29);
+    }
+    return date.toISOString().slice(0, 10);
+  }
+
+  private trendLabel(key: string, monthly: boolean): string {
+    const date = new Date(monthly ? `${key}-01T00:00:00Z` : `${key}T00:00:00Z`);
+    return date.toLocaleDateString(
+      'en-GB',
+      monthly
+        ? { month: 'short', year: 'numeric', timeZone: 'UTC' }
+        : { day: 'numeric', month: 'short', timeZone: 'UTC' }
+    );
+  }
+
+  // ---------- Charts ----------
 
   private updateChart() {
     const canvas = this.subsystemChartCanvas?.nativeElement;
@@ -366,6 +439,51 @@ export class Dashboard implements OnInit, OnDestroy {
         scales: {
           x: { min: 0, max: 100, grid: { color: '#f3f4f6' }, title: { display: true, text: 'Average score (%)' } },
           y: { grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  private updateTrendChart() {
+    const canvas = this.trendChartCanvas?.nativeElement;
+    if (!canvas) return;
+
+    const labels = this.trendPoints.map(p => p.label);
+    const values = this.trendPoints.map(p => p.average);
+
+    if (this.trendChart) {
+      this.trendChart.data.labels = labels;
+      this.trendChart.data.datasets[0].data = values;
+      this.trendChart.update();
+      return;
+    }
+
+    this.trendChart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Average risk score',
+          data: values,
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37, 99, 235, 0.1)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 2,
+          pointHoverRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 500 },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => `${ctx.parsed.y}%` } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+          y: { min: 0, max: 100, grid: { color: '#f3f4f6' }, ticks: { callback: value => `${value}%` } }
         }
       }
     });

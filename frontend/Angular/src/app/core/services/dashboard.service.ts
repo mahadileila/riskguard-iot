@@ -5,6 +5,7 @@ import {
   RiskTrendPoint,
   DashboardDevice,
   DashboardBuilding,
+  ScoreHistoryPoint,
 } from '../models/dashboard.model';
 
 @Injectable({ providedIn: 'root' })
@@ -26,5 +27,9 @@ export class DashboardService {
 
   getBuildings() {
     return this.api.get<DashboardBuilding[]>('/buildings');
+  }
+
+  getScoreHistory() {
+    return this.api.get<ScoreHistoryPoint[]>('/dashboard/score-history');
   }
 }

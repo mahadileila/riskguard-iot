@@ -12,7 +12,18 @@ this script never duplicates entries you already created manually
 through the UI (e.g. an existing "HVAC" subsystem is reused, not
 recreated).
 
+Run order:
+    1. seed_reference_data.py (this script)
+    2. seed_buildings.py        
+    3. seed_devices.py
+    4. seed_simulated_data.py
+    5. seed_score_history.py
+
 How to run it:
+    ##Optional: Run only the first two commands if you wish to empty the database##
+    docker compose exec backend rm -f instance/app.db
+    docker compose exec backend flask db upgrade
+    
     docker compose exec backend python seed_reference_data.py
 """
 
@@ -32,23 +43,23 @@ FACTORS = [
 # (subsystem_name, [(device_type_name, primary_data_collected), ...]) — Figure 3
 SUBSYSTEMS = [
     ("HVAC", [
-        ("Central thermostat", "Temperature, humidity, inferred presence"),
-        ("Temperature/humidity sensor", "Temperature, humidity"),
-        ("Air handling unit sensor", "Temperature, humidity, inferred presence"),
+        ("Central thermostat", "Temperature, Humidity, Inferred presence"),
+        ("Temperature/humidity sensor", "Temperature, Humidity"),
+        ("Air handling unit sensor", "Temperature, Humidity, Inferred presence"),
     ]),
     ("Lighting", [
-        ("Occupancy-linked light sensor", "Presence, zone occupancy"),
-        ("Automated dimming controller", "Presence, zone occupancy"),
+        ("Occupancy-linked light sensor", "Presence, Zone occupancy"),
+        ("Automated dimming controller", "Presence, Zone occupancy"),
     ]),
     ("Security", [
         ("CCTV camera", "Video/image"),
-        ("RFID badge reader", "Identity, access timestamps"),
+        ("RFID badge reader", "Identity, Access timestamps"),
         ("Smart lock", "Access timestamps"),
-        ("Intrusion detector", "Environmental data, event location"),
+        ("Intrusion detector", "Environmental data, Event location"),
     ]),
     ("Fire & life safety", [
-        ("Connected smoke/heat detector", "Environmental data, event location"),
-        ("Gas sensor", "Environmental data, event location"),
+        ("Connected smoke/heat detector", "Environmental data, Event location"),
+        ("Gas sensor", "Environmental data, Event location"),
     ]),
     ("Electrical", [
         ("Smart energy meter", "Electricity consumption (high frequency)"),
@@ -62,9 +73,9 @@ SUBSYSTEMS = [
         ("Parking occupancy sensor", "Vehicle presence"),
         ("LPR camera", "Vehicle presence, plate identifier"),
     ]),
-    ("Occupancy (cross-subsystem)", [
-        ("PIR sensor", "Presence, indoor localisation"),
-        ("People-counting sensor", "Presence, indoor localisation"),
+    ("Occupancy", [
+        ("PIR sensor", "Presence, Indoor localisation"),
+        ("People-counting sensor", "Presence, Indoor localisation"),
     ]),
 ]
 

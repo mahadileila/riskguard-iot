@@ -250,6 +250,28 @@ def get_dashboard_risk_trend():
         for row in results
     ])
 
+@main.route("/api/dashboard/score-history", methods=["GET"])
+def get_score_history():
+    rows = (
+        db.session.query(
+            RiskScoreHistory.id_device,
+            RiskScoreHistory.score,
+            RiskScoreHistory.computed_at,
+        )
+        .join(Device, Device.id_device == RiskScoreHistory.id_device)
+        .filter(Device.is_deleted.is_(False))
+        .all()
+    )
+
+    return jsonify([
+        {
+            "id_device": row.id_device,
+            "date": row.computed_at.date().isoformat(),
+            "score": float(row.score),
+        }
+        for row in rows
+    ])
+
 @main.route("/api/instances/ingest", methods=["POST"])
 def ingest_instance():
     """Simulates receiving a new collection instance from the external
@@ -899,7 +921,10 @@ def get_instance_data_samples(id_instance):
 
 @main.route("/api/risk-classifications", methods=["GET"])
 def get_risk_classifications():
-    bands = []
+    bands = [
+        {"label": "No Risk", "min_score": None, "max_score": None, "color": "gray",
+         "description": "Device has no active collection instance"}
+    ]
     for low, high, label, color in CLASSIFICATION_BANDS:
         bands.append({
             "label": label,

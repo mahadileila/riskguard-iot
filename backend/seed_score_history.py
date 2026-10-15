@@ -1,65 +1,63 @@
+"""
+Generates one year of simulated daily risk score snapshots per device, for the
+dashboard trend chart. Starting from today's live score, each earlier day is a
+small random step that is gently pulled back toward that score, so the history
+ends exactly on what the app shows now and never drifts to 0 or 100. These are
+demo data, not a reconstruction of real past states.
+
+Devices that already have history are skipped, so re-running is safe.
+
+Run order:
+    1. seed_reference_data.py 
+    2. seed_buildings.py        
+    3. seed_devices.py
+    4. seed_simulated_data.py
+    5. seed_score_history.py (this script)
+
+Run after seed_simulated_data.py:
+    docker compose exec backend python seed_score_history.py
+"""
 import random
 from datetime import datetime, timedelta, timezone
 from app import create_app, db
 from app.models import Device, RiskScoreHistory
-from app.services.risk_scoring import compute_device_score
+from app.services.risk_scoring import compute_device_score, classify_score
 
-"""
-Purpose: Generate simulated RiskScoreHistory snapshots for the past 30
-days, for every device that doesn't already have history entries. Each
-day gets one snapshot, produced as a small random walk around the
-device's current live score — this is synthetic data for demo/chart
-purposes, not a reconstruction of real past states (the app does not
-track how instance ratings changed over time).
-
-Safe to re-run: skips any device that already has history entries.
-
-Run order (after devices and their instances/ratings already exist):
-    docker compose exec backend python seed_score_history.py
-"""
-
-DAYS_OF_HISTORY = 30
+DAYS_OF_HISTORY = 365
+DAILY_NOISE = 3
+PULL_TOWARD_CURRENT = 0.03
 
 
 def seed():
     app = create_app()
     with app.app_context():
-        devices = Device.query.filter_by(is_deleted=False).all()
+        now = datetime.now(timezone.utc)
 
-        for device in devices:
-            existing = RiskScoreHistory.query.filter_by(id_device=device.id_device).count()
-            if existing > 0:
+        for device in Device.query.filter_by(is_deleted=False).all():
+            if RiskScoreHistory.query.filter_by(id_device=device.id_device).count() > 0:
                 continue
 
             current_score, current_classification = compute_device_score(device.id_device)
+            if current_classification["label"] == "No Risk":
+                continue
 
-            # Random walk backwards from today's live score, so the most
-            # recent snapshot roughly matches what the device shows now.
             walking_score = current_score
 
-            for days_ago in range(DAYS_OF_HISTORY, -1, -1):
-                snapshot_date = datetime.now(timezone.utc) - timedelta(days=days_ago)
-
-                if days_ago > 0:
-                    drift = random.uniform(-4, 4)
-                    walking_score = max(0.0, min(100.0, walking_score + drift))
-                    score_for_day = round(walking_score, 2)
+            for days_ago in range(DAYS_OF_HISTORY + 1):
+                if days_ago == 0:
+                    score = current_score
+                    label = current_classification["label"]
                 else:
-                    score_for_day = current_score  # today = the real live score
-
-                if score_for_day == 0:
-                    label = "No Risk"
-                elif score_for_day <= 33:
-                    label = "Low"
-                elif score_for_day <= 66:
-                    label = "Medium"
-                else:
-                    label = "High"
+                    noise = random.uniform(-DAILY_NOISE, DAILY_NOISE)
+                    walking_score += PULL_TOWARD_CURRENT * (current_score - walking_score) + noise
+                    walking_score = max(0.0, min(100.0, walking_score))
+                    score = round(walking_score, 2)
+                    label = classify_score(score)["label"]
 
                 db.session.add(RiskScoreHistory(
-                    score=score_for_day,
+                    score=score,
                     classification=label,
-                    computed_at=snapshot_date,
+                    computed_at=now - timedelta(days=days_ago),
                     id_device=device.id_device,
                 ))
 

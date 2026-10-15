@@ -91,15 +91,20 @@ export class BuildingList implements OnInit {
     this.showForm = false;
   }
 
+  private failSave(message: string) {
+    this.showForm = false;
+    this.showNotification('error', message);
+  }
+
   saveBuilding() {
     if (!this.formName.trim()) {
-      this.showNotification('error', 'Building name is required.');
+      this.failSave('Building name is required.');
       return;
     }
 
     const floorCount = Number(this.formFloorCount);
-    if (!Number.isInteger(floorCount) || floorCount < 1 || floorCount > 200) {
-      this.showNotification('error', 'Number of floors must be a whole number between 1 and 200.');
+    if (!Number.isInteger(floorCount) || floorCount < 1) {
+      this.failSave('Number of floors must be a whole number of at least 1.');
       return;
     }
 
@@ -117,10 +122,7 @@ export class BuildingList implements OnInit {
         this.showNotification('success', wasEditing ? 'Building updated.' : 'Building created.');
       },
       error: (err) => {
-        this.showNotification(
-          'error',
-          err.error?.error ?? 'Error while saving the building.'
-        );
+        this.failSave(err.error?.error ?? 'Error while saving the building.');
       }
     });
   }

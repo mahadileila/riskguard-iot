@@ -658,15 +658,16 @@ def get_device_instances(id_device):
 # ============================================================
 
 def parse_floor_count(value):
-    """Returns (floor_count, error_message). A building has 1 to 200 floors."""
+    """Returns (floor_count, error_message). A building has at least 1 floor."""
+    if isinstance(value, bool):
+        return None, "Field 'floor_count' must be a whole number"
     try:
         floor_count = int(value)
     except (TypeError, ValueError):
         return None, "Field 'floor_count' must be a whole number"
-    if floor_count < 1 or floor_count > 200:
-        return None, "Field 'floor_count' must be between 1 and 200"
+    if floor_count < 1:
+        return None, "Field 'floor_count' must be at least 1"
     return floor_count, None
-
 
 def serialize_building(building):
     return {

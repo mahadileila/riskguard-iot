@@ -22,3 +22,11 @@ dist/
 !**/.vscode/settings.json
 .DS_Store
 Thumbs.db
+
+# Stray build artifacts at repo root
+/main-test.js
+/package.json
+/package-lock.json
+.venv/
+.idea/
+*.log

@@ -9,21 +9,19 @@ services:
     env_file:
       - ./backend/.env
     volumes:
-      - ./backend:/app
+      - riskguard-data:/app/instance
     restart: unless-stopped
 
-  # frontend:
-  #   build:
-  #     context: ./frontend/Angular
-  #     dockerfile: Dockerfile.dev
-  #   container_name: riskguard-frontend
-  #   ports:
-  #     - "4200:4200"
-  #   volumes:
-  #     - ./frontend/Angular:/app
-  #     - /app/node_modules
-  #   environment:
-  #     - CHOKIDAR_USEPOLLING=true
-  #   depends_on:
-  #     - backend
-  #   restart: unless-stopped
+  frontend:
+    build:
+      context: ./frontend/Angular
+      dockerfile: Dockerfile
+    container_name: riskguard-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  riskguard-data:

@@ -11,7 +11,7 @@ class FactorGroup(db.Model):
     __tablename__ = "FACTOR_GROUP"
 
     id_factor_group = db.Column(db.String(36), primary_key=True, default=generate_uuid)
-    name = db.Column(db.String(50), nullable=False)  # 'impact' ou 'likelihood'
+    name = db.Column(db.String(50), nullable=False)  # 'impact' or 'likelihood'
 
     factors = db.relationship("RiskFactor", backref="group", lazy=True)
 
@@ -82,6 +82,8 @@ class Device(db.Model):
 
     id_device = db.Column(db.String(36), primary_key=True, default=generate_uuid)
     name = db.Column(db.String(50))
+    floor = db.Column(db.Integer, nullable=True)
+    zone = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     is_deleted = db.Column(db.Boolean, nullable=False, default=False)
     id_device_type = db.Column(
@@ -90,8 +92,6 @@ class Device(db.Model):
     id_building = db.Column(
         db.String(36), db.ForeignKey("BUILDING.id_building"), nullable=True
     )
-    floor = db.Column(db.Integer, nullable=True)
-    zone = db.Column(db.String(50), nullable=True)
 
     instances = db.relationship("CollectionInstance", backref="device", lazy=True)
     score_history = db.relationship("RiskScoreHistory", backref="device", lazy=True)
@@ -125,7 +125,7 @@ class InstanceFactorScore(db.Model):
     __tablename__ = "INSTANCE_FACTOR_SCORE"
 
     id_instance_factor_score = db.Column(db.String(36), primary_key=True, default=generate_uuid)
-    rating = db.Column(db.Integer)  # 0 à 4
+    rating = db.Column(db.Integer)  # 0 to 4
     id_instance = db.Column(
         db.String(36), db.ForeignKey("COLLECTION_INSTANCE.id_instance"), nullable=False
     )

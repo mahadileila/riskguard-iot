@@ -9,7 +9,7 @@ services:
     env_file:
       - ./backend/.env
     volumes:
-      - riskguard-data:/app/instance
+      - ./backend/instance:/app/instance
     restart: unless-stopped
 
   frontend:

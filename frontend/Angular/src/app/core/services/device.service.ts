@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
 import { Device } from '../models/device.model';
 import { CollectionInstance } from '../models/instance.model';
+import { Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class DeviceService {
@@ -29,5 +30,11 @@ export class DeviceService {
 
   getDeviceInstances(id: string) {
     return this.api.get<CollectionInstance[]>(`/devices/${id}/instances`);
+  }
+
+  importSamples(id: string, file: File): Observable<{ imported: number }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.api.post<{ imported: number }>(`/devices/${id}/data-samples/import`, formData);
   }
 }

@@ -6,6 +6,7 @@ from app.services.risk_scoring import CLASSIFICATION_BANDS
 from app.services.factor_mapping import compute_factor_ratings, InvalidAttributeError
 from functools import wraps
 from app.services.auth import verify_admin_credentials, generate_token, decode_token
+from app.services.csv_import import MAX_ERRORS, parse_samples_csv, CsvImportError
 import jwt as pyjwt
 
 from app.models import (
@@ -914,6 +915,72 @@ def get_instance_data_samples(id_instance):
         }
         for s in samples
     ])
+
+# ------------------------------------------------------------
+# CSV import of data samples
+# ------------------------------------------------------------
+
+def allowed_data_points(device_type):
+    """Data points a device type can collect, from DeviceType.primary_data_collected."""
+    raw = device_type.primary_data_collected or "General data"
+    points = [p.strip() for p in raw.split(",") if p.strip()]
+    return set(points) if points else {"General data"}
+
+
+@main.route("/api/devices/<id_device>/data-samples/import", methods=["POST"])
+def import_device_data_samples(id_device):
+    device = Device.query.filter_by(id_device=id_device, is_deleted=False).first()
+    if device is None:
+        return jsonify({"error": "Device not found"}), 404
+
+    uploaded = request.files.get("file")
+    if uploaded is None or not uploaded.filename:
+        return jsonify({"error": "A CSV file is required (field 'file')"}), 400
+    if not uploaded.filename.lower().endswith(".csv"):
+        return jsonify({"error": "File must have a .csv extension"}), 400
+
+    try:
+        rows = parse_samples_csv(uploaded.read())
+    except CsvImportError as e:
+        return jsonify({"error": "CSV validation failed", "details": e.errors}), 400
+
+    allowed = allowed_data_points(device.device_type)
+
+    # Match the 'Instance' column against this device's instances
+    by_description = {}
+    for instance in CollectionInstance.query.filter_by(id_device=id_device).all():
+        by_description.setdefault(instance.data_description, []).append(instance)
+
+    errors, samples = [], []
+    for row in rows:
+        # 1. The value must be a data point of the device type
+        if row["instance"] not in allowed:
+            errors.append(
+                f"Line {row['line']}: '{row['instance']}' is not a data point of device type "
+                f"'{device.device_type.name}' (allowed: {', '.join(sorted(allowed))})"
+            )
+            continue
+
+        # 2. A collection instance must exist on this device for it
+        matches = by_description.get(row["instance"], [])
+        if not matches:
+            errors.append(f"Line {row['line']}: no collection instance '{row['instance']}' exists on this device yet")
+        elif len(matches) > 1:
+            errors.append(f"Line {row['line']}: instance '{row['instance']}' is ambiguous (several instances share this description)")
+        else:
+            samples.append(DeviceDataSample(
+                id_instance=matches[0].id_instance,
+                data_value=row["value"],
+                captured_at=row["captured_at"],
+            ))
+
+    if errors:
+        return jsonify({"error": "CSV validation failed", "details": errors[:MAX_ERRORS]}), 400
+
+    # All-or-nothing: nothing is inserted if any line is invalid
+    db.session.add_all(samples)
+    db.session.commit()
+    return jsonify({"imported": len(samples)}), 201
 
 # ============================================================
 # RISK CLASSIFICATIONS (read-only reference list)
